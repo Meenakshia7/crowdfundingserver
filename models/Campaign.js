@@ -1,5 +1,4 @@
 
-
 const mongoose = require('mongoose');
 
 const campaignSchema = new mongoose.Schema(
@@ -39,12 +38,16 @@ const campaignSchema = new mongoose.Schema(
       enum: ['active', 'closed'],
       default: 'active',
     },
-    donations: [  // ✅ reference the Donation model (not filename, but model name)
+    donations: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Donation',
       },
     ],
+    image: {
+      type: String, // ✅ stores the filename or image path
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -52,4 +55,5 @@ const campaignSchema = new mongoose.Schema(
 const Campaign = mongoose.model('Campaign', campaignSchema);
 
 module.exports = Campaign;
+
 

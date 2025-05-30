@@ -1,17 +1,20 @@
 
-
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const path = require('path'); // ✅ added for static files
+
 const User = require('./models/User');
 const authMiddleware = require('./middleware/authMiddleware');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// ✅ Serve uploaded images statically (e.g., /uploads/myfile.jpg)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Home route
 app.get('/', (req, res) => {
@@ -47,7 +50,7 @@ app.post('/api/auth/register', async (req, res) => {
     const user = await User.create({
       name,
       email,
-      password,  // raw password, model will hash it
+      password,
       role,
     });
 
@@ -125,7 +128,7 @@ app.put('/api/auth/update-password', authMiddleware.protect, async (req, res) =>
     const isMatch = await user.comparePassword(currentPassword);
     if (!isMatch) return res.status(400).json({ message: 'Current password is incorrect' });
 
-    user.password = newPassword;  // raw password, model will hash it
+    user.password = newPassword;
     await user.save();
 
     res.json({ message: 'Password updated successfully' });
@@ -146,7 +149,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
-    user.password = newPassword;  // raw password, model will hash it
+    user.password = newPassword;
     await user.save();
 
     res.json({ message: 'Password reset successfully' });
@@ -167,4 +170,3 @@ app.use('/api/donations', donationRoutes);
 // Start server
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
-

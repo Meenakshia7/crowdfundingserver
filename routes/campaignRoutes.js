@@ -99,16 +99,12 @@
 
 
 
-
-
-
-
-
-
 const express = require('express');
 const router = express.Router();
 
 const { protect } = require('../middleware/authMiddleware');
+const upload = require('../middleware/uploadMiddleware'); // ✅ added
+
 const {
   getAllCampaigns,
   getUserCampaigns,
@@ -127,11 +123,11 @@ router.get('/my', protect, getUserCampaigns);
 // 🌍 Public: Get a single campaign by ID (placed after '/my' to avoid conflicts)
 router.get('/:id', getCampaignById);
 
-// 🔒 Protected: Create a new campaign
-router.post('/', protect, createCampaign);
+// 🔒 Protected: Create a new campaign with image upload
+router.post('/', protect, upload.single('image'), createCampaign); // ✅ added upload middleware
 
 // 🔒 Protected: Update a campaign (ownership check handled in controller)
-router.put('/:id', protect, updateCampaign);
+router.put('/:id', protect, upload.single('image'), updateCampaign); // ✅ added upload middleware
 
 // 🔒 Protected: Delete a campaign (ownership check handled in controller)
 router.delete('/:id', protect, deleteCampaign);

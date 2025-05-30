@@ -1,39 +1,36 @@
 
-
-
 const mongoose = require('mongoose');
 const Campaign = require('../models/Campaign');
-
-// ✅ You should also import Donation model (even if just for clarity, especially if you’ll later push donations)
 const Donation = require('../models/donation');
 
-// Optional centralized error handler
 const handleServerError = (res, err, location = '') => {
   console.error(`[CampaignController] ${location} error:`, err);
   res.status(500).json({ message: 'Server error', error: err.message });
 };
 
-// ✅ Create new campaign (simpler version)
+// ✅ Create new campaign with image upload
 exports.createCampaign = async (req, res) => {
   try {
     const { title, description, goalAmount } = req.body;
 
-    if (!title || !description || typeof goalAmount !== 'number' || goalAmount <= 0) {
+    if (!title || !description || isNaN(goalAmount) || Number(goalAmount) <= 0) {
       return res.status(400).json({
         message: 'Please provide a valid title, description, and positive goal amount',
       });
     }
 
     if (!req.user || !req.user.id) {
-      console.error('[CampaignController] createCampaign error: No user on request');
       return res.status(401).json({ message: 'Unauthorized: No user info' });
     }
+
+    const image = req.file ? req.file.filename : null; // ✅ get filename from multer
 
     const campaign = await Campaign.create({
       title,
       description,
-      goalAmount,
+      goalAmount: Number(goalAmount),
       owner: req.user.id,
+      image, // ✅ store filename
     });
 
     res.status(201).json(campaign);
@@ -49,7 +46,7 @@ exports.getAllCampaigns = async (req, res) => {
       .populate('owner', 'name email')
       .populate({
         path: 'donations',
-        model: 'Donation',  // ✅ explicitly set the model name
+        model: 'Donation',
       });
 
     res.json(campaigns);
@@ -62,7 +59,6 @@ exports.getAllCampaigns = async (req, res) => {
 exports.getUserCampaigns = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
-      console.error('[CampaignController] getUserCampaigns error: No user on request');
       return res.status(401).json({ message: 'Unauthorized: No user info' });
     }
 
@@ -70,7 +66,7 @@ exports.getUserCampaigns = async (req, res) => {
       .populate('owner', 'name email')
       .populate({
         path: 'donations',
-        model: 'Donation',  // ✅ explicitly set the model name
+        model: 'Donation',
       });
 
     res.json(campaigns);
@@ -92,7 +88,7 @@ exports.getCampaignById = async (req, res) => {
       .populate('owner', 'name email')
       .populate({
         path: 'donations',
-        model: 'Donation',  // ✅ explicitly set the model name
+        model: 'Donation',
       });
 
     if (!campaign) {
@@ -105,7 +101,7 @@ exports.getCampaignById = async (req, res) => {
   }
 };
 
-// ✅ Update campaign (only by owner or admin)
+// ✅ Update campaign with optional image upload
 exports.updateCampaign = async (req, res) => {
   const { id } = req.params;
 
@@ -128,10 +124,15 @@ exports.updateCampaign = async (req, res) => {
     }
 
     const { title, description, goalAmount, status } = req.body;
+
     if (title !== undefined) campaign.title = title;
     if (description !== undefined) campaign.description = description;
-    if (goalAmount !== undefined) campaign.goalAmount = goalAmount;
+    if (goalAmount !== undefined) campaign.goalAmount = Number(goalAmount);
     if (status !== undefined) campaign.status = status;
+
+    if (req.file) {
+      campaign.image = req.file.filename; // ✅ update image if a new file is uploaded
+    }
 
     const updatedCampaign = await campaign.save();
     res.json(updatedCampaign);
@@ -140,7 +141,7 @@ exports.updateCampaign = async (req, res) => {
   }
 };
 
-// ✅ Delete campaign (only by owner or admin)
+// ✅ Delete campaign
 exports.deleteCampaign = async (req, res) => {
   const { id } = req.params;
 
