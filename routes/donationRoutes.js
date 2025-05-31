@@ -11,10 +11,14 @@ const {
   getAllDonations,
 } = require('../controllers/donationController');
 
-router.post('/', protect, createDonation);
+// Anyone (authenticated or not) can create a donation
+router.post('/', createDonation);
+
+// Protect these routes if you want only authenticated users to access
 router.get('/campaign/:campaignId', protect, getDonationsByCampaign);
 router.get('/user/:userId', protect, getDonationsByUser);
-router.get('/', protect, admin, getAllDonations); // admin-only
+
+// Admin-only
+router.get('/', protect, admin, getAllDonations);
 
 module.exports = router;
-

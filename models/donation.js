@@ -1,4 +1,6 @@
 
+
+
 const mongoose = require('mongoose');
 
 const donationSchema = new mongoose.Schema(
@@ -15,7 +17,7 @@ const donationSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false, // <-- user is now optional
     },
     campaign: {
       type: mongoose.Schema.Types.ObjectId,

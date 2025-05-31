@@ -1,13 +1,22 @@
 
+
 const Donation = require('../models/donation');
 const Campaign = require('../models/Campaign');
 
-// POST /api/donations
+// POST /api/donations - create donation, user optional
 const createDonation = async (req, res) => {
-  const { amount, message, campaignId } = req.body;
+  const { amount, message = '', campaignId } = req.body;
 
-  if (amount < 1) {
+  if (!campaignId) {
+    return res.status(400).json({ message: 'Campaign ID is required' });
+  }
+
+  if (!amount || amount < 1) {
     return res.status(400).json({ message: 'Minimum donation is $1' });
+  }
+
+  if (message.length > 200) {
+    return res.status(400).json({ message: 'Message cannot exceed 200 characters' });
   }
 
   try {
@@ -16,23 +25,29 @@ const createDonation = async (req, res) => {
       return res.status(404).json({ message: 'Campaign not found' });
     }
 
-    const donation = await Donation.create({
+    const donationData = {
       amount,
       message,
-      user: req.user._id,
       campaign: campaignId,
-    });
+    };
+
+    if (req.user && req.user._id) {
+      donationData.user = req.user._id;
+    }
+
+    const donation = await Donation.create(donationData);
 
     campaign.raisedAmount += amount;
     await campaign.save();
 
     res.status(201).json(donation);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Donation creation error:', error);
+    res.status(500).json({ message: 'Server error while processing donation' });
   }
 };
 
-// GET /api/donations/campaign/:campaignId
+// GET donations by campaign
 const getDonationsByCampaign = async (req, res) => {
   try {
     const donations = await Donation.find({ campaign: req.params.campaignId })
@@ -41,11 +56,12 @@ const getDonationsByCampaign = async (req, res) => {
 
     res.json(donations);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching donations by campaign:', error);
+    res.status(500).json({ message: 'Server error fetching donations' });
   }
 };
 
-// GET /api/donations/user/:userId
+// GET donations by user
 const getDonationsByUser = async (req, res) => {
   try {
     const donations = await Donation.find({ user: req.params.userId })
@@ -54,11 +70,12 @@ const getDonationsByUser = async (req, res) => {
 
     res.json(donations);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching donations by user:', error);
+    res.status(500).json({ message: 'Server error fetching donations' });
   }
 };
 
-// GET /api/donations (admin only)
+// GET all donations (admin only)
 const getAllDonations = async (req, res) => {
   try {
     const donations = await Donation.find()
@@ -68,7 +85,8 @@ const getAllDonations = async (req, res) => {
 
     res.json(donations);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching all donations:', error);
+    res.status(500).json({ message: 'Server error fetching donations' });
   }
 };
 
