@@ -1,5 +1,6 @@
 
 
+
 const Donation = require('../models/donation');
 const Campaign = require('../models/Campaign');
 
@@ -35,12 +36,20 @@ const createDonation = async (req, res) => {
       donationData.user = req.user._id;
     }
 
+    // Create the donation
     const donation = await Donation.create(donationData);
 
+    // Update campaign raisedAmount and status if goal reached
     campaign.raisedAmount += amount;
+
+    if (campaign.raisedAmount >= campaign.goalAmount && campaign.status === 'active') {
+      campaign.status = 'completed';
+    }
+
     await campaign.save();
 
-    res.status(201).json(donation);
+    // Return both donation and updated campaign
+    res.status(201).json({ donation, campaign });
   } catch (error) {
     console.error('Donation creation error:', error);
     res.status(500).json({ message: 'Server error while processing donation' });

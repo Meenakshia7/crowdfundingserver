@@ -35,7 +35,7 @@ const campaignSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'closed'],
+      enum: ['active', 'completed', 'withdrawn', 'closed'],  // ✅ added completed + withdrawn
       default: 'active',
     },
     donations: [
@@ -45,8 +45,12 @@ const campaignSchema = new mongoose.Schema(
       },
     ],
     image: {
-      type: String, // ✅ stores the filename or image path
+      type: String, // stores the filename or image path
       default: null,
+    },
+    withdrawn: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }
@@ -55,5 +59,3 @@ const campaignSchema = new mongoose.Schema(
 const Campaign = mongoose.model('Campaign', campaignSchema);
 
 module.exports = Campaign;
-
-
