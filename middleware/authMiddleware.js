@@ -5,7 +5,6 @@ const User = require('../models/User');
 
 // Middleware to protect routes and attach user to req
 const protect = async (req, res, next) => {
-  // Helper: extract token from header
   const getTokenFromHeader = () => {
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -22,7 +21,6 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    // Verify token with JWT secret
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     if (!decoded || !decoded.id) {
@@ -30,7 +28,6 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: 'Invalid token payload' });
     }
 
-    // Find user by ID from token payload, exclude password field
     const user = await User.findById(decoded.id).select('-password');
 
     if (!user) {
@@ -38,7 +35,12 @@ const protect = async (req, res, next) => {
       return res.status(401).json({ message: 'User not found' });
     }
 
-    // Attach user to request and proceed
+    // Optional: block disabled/suspended users
+    if (user.status === 'disabled') {
+      console.warn(`protect middleware: User ${user.id} is disabled`);
+      return res.status(403).json({ message: 'Account disabled, contact admin' });
+    }
+
     req.user = user;
     next();
   } catch (error) {
@@ -52,7 +54,7 @@ const admin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
     return next();
   }
-  console.warn(`admin middleware: User ${req.user ? req.user.id : 'unknown'} is not admin`);
+  console.warn(`adminProtect middleware: User ${req.user ? req.user.id : 'unknown'} is not admin`);
   return res.status(403).json({ message: 'Admin access required' });
 };
 

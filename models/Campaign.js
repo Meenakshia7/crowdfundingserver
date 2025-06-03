@@ -19,8 +19,8 @@ const campaignSchema = new mongoose.Schema(
       required: [true, 'Goal amount is required'],
       min: [1, 'Goal amount must be at least 1'],
       validate: {
-        validator: Number.isInteger,
-        message: 'Goal amount must be an integer',
+        validator: Number.isFinite,
+        message: 'Goal amount must be a valid number',
       },
     },
     raisedAmount: {
@@ -35,8 +35,8 @@ const campaignSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'completed', 'withdrawn', 'closed'],  // ✅ added completed + withdrawn
-      default: 'active',
+      enum: ['pending', 'approved', 'rejected', 'active', 'completed', 'withdrawn', 'closed'], // ✅ added admin states
+      default: 'pending', // ✅ starts as pending, admin approves
     },
     donations: [
       {
@@ -45,16 +45,31 @@ const campaignSchema = new mongoose.Schema(
       },
     ],
     image: {
-      type: String, // stores the filename or image path
+      type: String, // filename or image path
       default: null,
     },
     withdrawn: {
       type: Boolean,
       default: false,
     },
+    categories: {
+      type: [String],
+      default: [], // ✅ optional: for filtering/search (e.g., ['health', 'education'])
+    },
+    deadline: {
+      type: Date,
+      default: null, // ✅ optional: deadline for campaign
+    },
+    rejectionReason: {
+  type: String,
+  default: null,
+},
+
   },
   { timestamps: true }
 );
+
+// ✅ Add virtuals or computed fields here if needed later (e.g., progress percentage)
 
 const Campaign = mongoose.model('Campaign', campaignSchema);
 

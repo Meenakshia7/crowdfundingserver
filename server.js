@@ -1,10 +1,12 @@
 
+
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
-const path = require('path'); // ✅ added for static files
+const path = require('path');
+const adminRoutes = require('./routes/adminRoutes');  // Existing admin routes
 
 const User = require('./models/User');
 const authMiddleware = require('./middleware/authMiddleware');
@@ -13,7 +15,12 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ Serve uploaded images statically (e.g., /uploads/myfile.jpg)
+// Use existing admin routes
+app.use('/api/admin', adminRoutes);
+
+
+
+// Serve uploaded images statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Home route
@@ -54,7 +61,7 @@ app.post('/api/auth/register', async (req, res) => {
       role,
     });
 
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '2h' });
+    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: '3h' });
 
     res.json({
       token,
@@ -159,11 +166,11 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-// ✅ CAMPAIGN ROUTES
+// CAMPAIGN ROUTES
 const campaignRoutes = require('./routes/campaignRoutes');
 app.use('/api/campaigns', campaignRoutes);
 
-// ✅ DONATION ROUTES
+// DONATION ROUTES
 const donationRoutes = require('./routes/donationRoutes');
 app.use('/api/donations', donationRoutes);
 

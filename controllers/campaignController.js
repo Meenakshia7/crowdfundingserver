@@ -8,7 +8,7 @@ const handleServerError = (res, err, location = '') => {
   res.status(500).json({ message: 'Server error', error: err.message });
 };
 
-// ✅ Create new campaign
+// ✅ Create new campaign (defaults to pending)
 exports.createCampaign = async (req, res) => {
   try {
     const { title, description, goalAmount } = req.body;
@@ -31,22 +31,22 @@ exports.createCampaign = async (req, res) => {
       goalAmount: Number(goalAmount),
       owner: req.user.id,
       image,
-      status: 'active',
       withdrawn: false,
       raisedAmount: 0,
+      status: 'pending',
     });
 
-    res.status(201).json(campaign);
+    res.status(201).json({ message: 'Campaign submitted for review', campaign });
   } catch (err) {
     handleServerError(res, err, 'createCampaign');
   }
 };
 
-// ✅ Get all campaigns with status active, completed, or withdrawn
+// ✅ Public: Get all campaigns (active, completed, withdrawn)
 exports.getAllCampaigns = async (req, res) => {
   try {
     const campaigns = await Campaign.find({
-      status: { $in: ['active', 'completed', 'withdrawn'] }
+      status: { $in: ['active', 'completed', 'withdrawn'] },
     })
       .populate('owner', 'name email')
       .populate({ path: 'donations', model: 'Donation' });
@@ -57,7 +57,7 @@ exports.getAllCampaigns = async (req, res) => {
   }
 };
 
-// ✅ Get campaigns by user
+// ✅ Get campaigns by logged-in user
 exports.getUserCampaigns = async (req, res) => {
   try {
     if (!req.user || !req.user.id) {
@@ -74,7 +74,7 @@ exports.getUserCampaigns = async (req, res) => {
   }
 };
 
-// ✅ Get campaign by ID (auto-update status if goal reached)
+// ✅ Get campaign by ID
 exports.getCampaignById = async (req, res) => {
   const { id } = req.params;
 
@@ -91,7 +91,6 @@ exports.getCampaignById = async (req, res) => {
       return res.status(404).json({ message: 'Campaign not found' });
     }
 
-    // Auto-update status if goal reached
     if (
       campaign.raisedAmount >= campaign.goalAmount &&
       campaign.status === 'active'
@@ -106,7 +105,7 @@ exports.getCampaignById = async (req, res) => {
   }
 };
 
-// ✅ Update campaign
+// ✅ Update campaign (owner or admin)
 exports.updateCampaign = async (req, res) => {
   const { id } = req.params;
 
@@ -135,7 +134,6 @@ exports.updateCampaign = async (req, res) => {
     if (status !== undefined) campaign.status = status;
     if (req.file) campaign.image = req.file.filename;
 
-    // Auto-update status if raisedAmount >= new goalAmount
     if (
       campaign.raisedAmount >= campaign.goalAmount &&
       campaign.status === 'active'
@@ -150,7 +148,7 @@ exports.updateCampaign = async (req, res) => {
   }
 };
 
-// ✅ Delete campaign with safeguards (allow deletion if withdrawn, block if completed)
+// ✅ Delete campaign
 exports.deleteCampaign = async (req, res) => {
   const { id } = req.params;
 
@@ -171,12 +169,9 @@ exports.deleteCampaign = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to delete this campaign' });
     }
 
-    // Prevent deleting completed campaigns only
     if (campaign.status === 'completed') {
       return res.status(400).json({ message: 'Cannot delete a completed campaign' });
     }
-
-    console.log(`[Delete Request] User ${req.user.id} requested delete on campaign ${id}`);
 
     await campaign.deleteOne();
     res.json({ message: 'Campaign deleted successfully' });
@@ -185,7 +180,7 @@ exports.deleteCampaign = async (req, res) => {
   }
 };
 
-// ✅ Withdraw funds (with safe checks)
+// ✅ Withdraw funds
 exports.withdrawCampaignFunds = async (req, res) => {
   const { id } = req.params;
 
@@ -206,17 +201,14 @@ exports.withdrawCampaignFunds = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to withdraw funds' });
     }
 
-    // Check if goal reached
     if (campaign.raisedAmount < campaign.goalAmount) {
       return res.status(400).json({ message: 'Cannot withdraw: goal not yet reached' });
     }
 
-    // Check if already withdrawn
     if (campaign.withdrawn === true) {
       return res.status(400).json({ message: 'Funds already withdrawn' });
     }
 
-    // Mark withdrawn + reset raisedAmount + update status
     campaign.withdrawn = true;
     campaign.raisedAmount = 0;
     campaign.status = 'withdrawn';
@@ -229,5 +221,128 @@ exports.withdrawCampaignFunds = async (req, res) => {
     });
   } catch (err) {
     handleServerError(res, err, 'withdrawCampaignFunds');
+  }
+};
+
+// ✅ Admin: Get all pending campaigns
+exports.getPendingCampaigns = async (req, res) => {
+  try {
+    const campaigns = await Campaign.find({ status: 'pending' })
+      .populate('owner', 'name email');
+
+    const detailed = await Promise.all(
+      campaigns.map(async (campaign) => {
+        const donationCount = await Donation.countDocuments({ campaign: campaign._id });
+        const donations = await Donation.aggregate([
+          { $match: { campaign: campaign._id } },
+          { $group: { _id: null, totalAmount: { $sum: '$amount' } } },
+        ]);
+        const totalDonated = donations.length ? donations[0].totalAmount : 0;
+
+        const progressPercent = campaign.goalAmount > 0
+          ? Math.min((totalDonated / campaign.goalAmount) * 100, 100)
+          : 0;
+
+        return {
+          ...campaign.toObject(),
+          donationCount,
+          totalDonated,
+          progressPercent: Number(progressPercent.toFixed(2)),
+        };
+      })
+    );
+
+    res.json(detailed);
+  } catch (err) {
+    handleServerError(res, err, 'getPendingCampaigns');
+  }
+};
+
+// ✅ Admin: Approve campaign
+exports.approveCampaign = async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'Invalid campaign ID format' });
+  }
+
+  try {
+    const campaign = await Campaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({ message: 'Campaign not found' });
+    }
+
+    if (campaign.status !== 'pending') {
+      return res.status(400).json({ message: 'Only pending campaigns can be approved' });
+    }
+
+    campaign.status = 'active';
+    await campaign.save();
+
+    res.json({ message: 'Campaign approved successfully', campaign });
+  } catch (err) {
+    handleServerError(res, err, 'approveCampaign');
+  }
+};
+
+// ✅ Admin: Reject campaign with reason
+exports.rejectCampaign = async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'Invalid campaign ID format' });
+  }
+
+  try {
+    const campaign = await Campaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({ message: 'Campaign not found' });
+    }
+
+    if (campaign.status !== 'pending') {
+      return res.status(400).json({ message: 'Only pending campaigns can be rejected' });
+    }
+
+    campaign.status = 'rejected';
+    campaign.rejectionReason = reason || 'No reason provided';
+    await campaign.save();
+
+    res.json({ message: 'Campaign rejected', reason: campaign.rejectionReason });
+  } catch (err) {
+    handleServerError(res, err, 'rejectCampaign');
+  }
+};
+
+// ✅ Admin: Edit any campaign
+exports.editCampaign = async (req, res) => {
+  const { id } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: 'Invalid campaign ID format' });
+  }
+
+  try {
+    const campaign = await Campaign.findById(id);
+    if (!campaign) {
+      return res.status(404).json({ message: 'Campaign not found' });
+    }
+
+    const { title, description, goalAmount, status } = req.body;
+
+    if (title !== undefined) campaign.title = title;
+    if (description !== undefined) campaign.description = description;
+    if (goalAmount !== undefined) campaign.goalAmount = Number(goalAmount);
+    if (status !== undefined) campaign.status = status;
+    if (req.file) campaign.image = req.file.filename;
+
+    const updated = await campaign.save();
+
+    res.json({
+      message: 'Campaign updated by admin',
+      campaign: updated,
+    });
+  } catch (err) {
+    handleServerError(res, err, 'editCampaign');
   }
 };
