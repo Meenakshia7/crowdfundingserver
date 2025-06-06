@@ -1,4 +1,6 @@
 
+
+
 const express = require('express');
 const router = express.Router();
 const adminController = require('../controllers/adminController');
@@ -14,6 +16,8 @@ router.get('/stats', protect, admin, adminController.getSystemStats);
 // ======= Campaign management routes =======
 router.get('/campaigns', protect, admin, adminController.getAllCampaigns);
 router.get('/campaigns/pending', protect, admin, adminController.getPendingCampaignsDetailed);
+router.get('/campaigns/status/:status', protect, admin, adminController.getCampaignsByStatus); // ✅ New route
+
 router.put('/campaigns/:id/approve', protect, admin, adminController.approveCampaign);
 router.put('/campaigns/:id/reject', protect, admin, adminController.rejectCampaign);
 

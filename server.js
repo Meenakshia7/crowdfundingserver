@@ -7,6 +7,7 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const path = require('path');
 const adminRoutes = require('./routes/adminRoutes');  // Existing admin routes
+const userRoutes = require('./routes/userRoutes');
 
 const User = require('./models/User');
 const authMiddleware = require('./middleware/authMiddleware');
@@ -18,7 +19,7 @@ app.use(express.json());
 // Use existing admin routes
 app.use('/api/admin', adminRoutes);
 
-
+app.use('/api/users', userRoutes); // <--- This line is crucial
 
 // Serve uploaded images statically
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
